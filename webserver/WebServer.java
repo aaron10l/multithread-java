@@ -94,11 +94,32 @@ final class HttpRequest implements Runnable{
     if (fileExists){
       statusLine = "HTTP/1.1 200 OK" + CRLF;
       contentTypeLine = "Content-type: " + contentType(fileName) + CRLF;
-    } else {
-      statusLine = "HTTP/1.1 404 Not Found" + CRLF;
-      contentTypeLine = "Content-type: text/html" + CRLF;
-      entityBody = "<HTML>" + "<HEAD><TITLE>Not Found</TITLE></HEAD>" +
-                 "<BODY>Not Found</BODY></HTML>";
+    } else { //if requested file is not a .txt, report error to web client
+      if (!contentType(fileName).equalsIgnoreCase("text/plain")){
+        statusLine = "HTTP/1.1 404 Not Found" + CRLF;
+        contentTypeLine = "Content-type: text/html" + CRLF;
+        entityBody = "<HTML>" + "<HEAD><TITLE>Not Found</TITLE></HEAD>" +
+                   "<BODY>Not Found</BODY></HTML>";
+      } else { // retrieve txt file from ftp server
+        statusLine = "HTTP/1.1 200 OK" + CRLF;
+        contentTypeLine = "Content-type: text/plain" + CRLF;
+
+        // create instance of ftp client
+        FtpClient ftpClient = new FtpClient();
+
+        // connect to ftp server
+        ftpClient.connect("hello", "world");
+
+        // retrieve file from ftp server
+        ftpClient.getFile(fileName);
+        //System.out.println(fileName);
+
+        // disconnect from ftp server
+        ftpClient.disconnect();
+
+        // assign input strema to read recently downloaded ftp file
+        fis = new FileInputStream(fileName);
+      }
     }
 
     // printing response
@@ -121,7 +142,12 @@ final class HttpRequest implements Runnable{
       sendBytes(fis, os);
       fis.close();
     } else {
-      os.writeBytes(entityBody);
+      if (!contentType(fileName).equalsIgnoreCase("text/plain")){
+        os.writeBytes(entityBody);
+      } else {
+        sendBytes(fis, os);
+        fis.close();
+      }
     }
 
     // close streams and socket
@@ -150,6 +176,8 @@ final class HttpRequest implements Runnable{
       return "image/jpeg";
     } else if (fileName.endsWith(".png")){
       return "image/png";
+    } else if (fileName.endsWith(".txt")){
+      return "text/plain";
     } else {
       return "application/octet-stream";
     }
